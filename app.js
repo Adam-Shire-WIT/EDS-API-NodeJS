@@ -1,6 +1,7 @@
 var express = require('express');
 var session = require('express-session');
 var app = express();
+var morgan = require('morgan')
 
 
 var querystring = require("querystring");
@@ -10,16 +11,23 @@ var parseString = require('xml2js').parseString;
 var util = require('util');
 //EDS common functions used for this API implementations
 var foobar = require('./common.js');
+require('dotenv').config();
 
+const SESSION_SECRET = process.env.SESSION_SECRET;
+
+app.use(morgan('combined'))
 
 app.use(session({
 	name: 'eds_session',
-	secret: 'chakerismakerisblablabla',
+	secret: SESSION_SECRET,
+	resave: false,
+	saveUninitialized: true,
 	cookie: {
         path: '/',
         //domain: 'yourdomain.com',
-        maxAge: 1000 * 60 * 24, // 24 hours	
+        maxAge: 1000 * 60 * 24, // 24 hours
         httpOnly: false
+
 	}
 }));
 
@@ -35,7 +43,7 @@ app.use(function(req, res, next) {
 /*
 app.use(cookieSession({
   name: 'eds_session',
-  
+
 }))
 */
 
@@ -54,7 +62,7 @@ app.get('/', function (req, res) {
 
 
 app.get('/search', function (req, res, next) {
-//console.log('req : '+util.inspect(req, {showHidden: false, depth: null}));	
+//console.log('req : '+util.inspect(req, {showHidden: false, depth: null}));
 foobar.getAuthToken(res, req)
 var body =  '<html>\n'+
 '<head>\n'+
@@ -87,14 +95,14 @@ var resultsXML ='';
 var bquery2 = querystring.escape(req.query.bquery)
 console.log ('palabra clave: ' + bquery2);
 var options = {
-  host: 'eds-api.ebscohost.com',  
+  host: 'eds-api.ebscohost.com',
   path: '/edsapi/rest/Search?query-1=AND,' + bquery2,
   method: 'GET',
 
   headers: {
 	'Content-Type': 'application/xml',
     'x-authenticationToken': req.session.authToken,
-    'x-sessionToken': req.session.sessionToken    
+    'x-sessionToken': req.session.sessionToken
   }
 };
 
@@ -103,19 +111,19 @@ var options = {
 var request = http.request(options, function(response) {
 	console.log('STATUS: ' + response.statusCode);
 	console.log('HEADERS: ' + JSON.stringify(response.headers));
-  
+
 	response.on('data', function (chunk) {
 		resultsXML += chunk
-	    //console.log('BODY: ' + chunk);
+	    // console.log('BODY: ' + chunk);
 	  });
-	  
+
 	response.on('end', function(){
 		var xml = resultsXML
 		parseString(xml, function (err, result) {
-			//console.dir(result)		
+			// console.dir(result)
 		});
-		foobar.edsResults(res, req, xml);	
-	})  
+		foobar.edsResults(res, req, xml);
+	})
 });
 
 request.on('error', function(e) {
@@ -123,7 +131,7 @@ request.on('error', function(e) {
 });
 request.end();
 ///////
-	
+
 });
 
 
@@ -137,14 +145,14 @@ var dbid = querystring.escape(req.query.dbid)
 var an   = querystring.escape(req.query.an)
 //http://eds-api.ebscohost.com  dbid=a9h&an=36108341
 var options = {
-  host: 'eds-api.ebscohost.com',  
+  host: 'eds-api.ebscohost.com',
   path: '/edsapi/rest/retrieve?dbid=' + dbid + '&an=' + an ,
   method: 'GET',
 
   headers: {
 	'Content-Type': 'application/xml',
     'x-authenticationToken': req.session.authToken,
-    'x-sessionToken': req.session.sessionToken    
+    'x-sessionToken': req.session.sessionToken
   }
 };
 
@@ -152,39 +160,37 @@ var options = {
 var request = http.request(options, function(response) {
 	console.log('STATUS: ' + response.statusCode);
 	console.log('HEADERS: ' + JSON.stringify(response.headers));
-  
+
 	response.on('data', function (chunk) {
 		recordXML += chunk
 	    //console.log('BODY: ' + chunk);
 	  });
-	  
+
 	response.on('end', function(){
 		var xml = recordXML
 		parseString(xml, function (err, result) {
-			//console.dir(result)		
+			//console.dir(result)
 		});
-		foobar.edsRecord(res, req, xml);	
-	})  
+		foobar.edsRecord(res, req, xml);
+	})
 });
 
 request.on('error', function(e) {
   console.log('problem with request: ' + e.message);
 });
 request.end();
-	
+
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 app.get('/test', function (req, res) {
-	console.log('req : '+util.inspect(req, {showHidden: false, depth: null}));	
+	console.log('req : '+util.inspect(req, {showHidden: false, depth: null}));
 	var body = 'Auth ' + req.session.authToken + '<br />';
 	body += 'Session ' + req.session.sessionToken + '<br />';
 	res.writeHead(200, {"Content-Type": "text/html"});
 	res.write(body);
-	res.end();	
-	
+	res.end();
+
 });
-
-

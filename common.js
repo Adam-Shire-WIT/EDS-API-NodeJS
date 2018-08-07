@@ -3,6 +3,11 @@ var https = require("https");
 var parseString = require('xml2js').parseString;
 var querystring = require("querystring");
 var util = require('util');
+require('dotenv').config();
+
+const EDS_USER = process.env.EDS_USER;
+const EDS_PASS = process.env.EDS_PASS;
+const EDS_PROFILE = 'eds_api';
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,38 +21,38 @@ var sessionTokenXML =''
 
 
 var options = {
-  host: 'eds-api.ebscohost.com',  
-  path: '/edsapi/rest/createsession?profile=edsapi&guest=n&limiter=FT:y',
+  host: 'eds-api.ebscohost.com',
+  path: `/edsapi/rest/createsession?profile=${EDS_PROFILE}&guest=n&limiter=FT:y`,
   method: 'GET',
-  //query : querystring.stringify({ profile: 'edsapi', guest: 'Y'}), 
+  //query : querystring.stringify({ profile: 'edsapi', guest: 'Y'}),
   headers: {
 	'Content-Type': 'application/xml',
     'x-authenticationToken': authToken
   }
 };
-console.log(querystring.stringify({ profile: 'edsapi', guest: 'Y', org: ''}));
+console.log(querystring.stringify({ profile: EDS_PROFILE, guest: 'Y', org: ''}));
 console.log(authToken);
 
 var request = http.request(options, function(response) {
   console.log('STATUS: ' + response.statusCode);
   console.log('HEADERS: ' + JSON.stringify(response.headers));
-  
+
 response.on('data', function (chunk) {
 	sessionTokenXML += chunk
     console.log('BODY: ' + chunk);
   });
-  
+
 response.on('end', function(){
 	var xml = sessionTokenXML
 	parseString(xml, function (err, result) {
 	    console.dir(result)
-		console.log(result.CreateSessionResponseMessage.SessionToken[0]);	    
+		console.log(result.CreateSessionResponseMessage.SessionToken[0]);
 		session = result.CreateSessionResponseMessage.SessionToken[0];
 	    req.session.sessionToken=session;
-	    req.session.save();		
-	});	
-	
-})  
+	    req.session.save();
+	});
+
+})
 });
 request.on('error', function(e) {
   console.log('problem with request: ' + e.message);
@@ -64,21 +69,24 @@ request.end();
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function getAuthToken(res, req){
-//var reqCopy= req;
-//eds_session.sessionToken = "bla";
-//The line below contains tha auth data from a customer with all the possible cases: custom links, metrics (ej scopus,) and full text
-//var authData = '<UIDAuthRequestMessage xmlns="http://www.ebscohost.com/services/public/AuthService/Response/2012/06/01"><UserId>ns196274</UserId><Password>password</Password><InterfaceId>edsapi</InterfaceId></UIDAuthRequestMessage>';
+
+  //check for existing Auth token
+
+  // if an doesn't exist get a new one
+  // if (!AuthToken) {
+
+
+
 var authData = '<UIDAuthRequestMessage xmlns="http://www.ebscohost.com/services/public/AuthService/Response/2012/06/01">'+
-	'<UserId>jesusel</UserId>'+
-	'<Password>password</Password>'+
-	'<InterfaceId>edsapi</InterfaceId>'+
+	'<UserId>'+EDS_USER+'</UserId>'+
+	'<Password>'+EDS_PASS+'</Password>'+
+	'<InterfaceId>eds_api</InterfaceId>'+
 '</UIDAuthRequestMessage>';
 var authTokenXML =''
 //console.log('req : '+util.inspect(req, {showHidden: false, depth: null}));
 
 var options = {
   hostname: 'eds-api.ebscohost.com',
-
   path: '/authservice/rest/uidauth',
   method: 'POST',
   headers: {
@@ -92,12 +100,12 @@ var request = https.request(options, function(response) {
   console.log('HEADERS: ' + JSON.stringify(response.headers));
   req.session.authToken=''
   response.setEncoding('utf8');
-  
+
 response.on('data', function (chunk) {
 	authTokenXML += chunk
     console.log('BODY: ' + chunk);
   });
-  
+
 response.on('end', function(){
 	var xml = authTokenXML
 	parseString(xml, function (err, result) {
@@ -108,10 +116,10 @@ response.on('end', function(){
 	    //console.log('req : '+util.inspect(req, {showHidden: false, depth: null}));
 	    //console.log('request2 : '+request2.eds_api_session.authToken);
 	    req.session.save();
-	});	
+	});
 	//console.log('BODY2: ' + authTokenXML);
 })
-  
+
 });
 request.on('error', function(e) {
   console.log('problem with request: ' + e.message);
@@ -164,7 +172,7 @@ function edsResults(res, req, xml){
 	res.writeHead(200, {"Content-Type": "text/html"});
 	res.write('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />\n');
 	res.write(body);
-	
+
 
 	parseString(xml, function (err, result) {
 		if (result.SearchResponseMessageGet != null){
@@ -172,12 +180,12 @@ function edsResults(res, req, xml){
 			if (totalHits != 0){
 				var resultsLength = result.SearchResponseMessageGet.SearchResult[0].Data[0].Records[0].Record.length;
 				res.write('<p>Showing ' + resultsLength + ' of ');
-				res.write(totalHits + 'results<p>');		
+				res.write(totalHits + 'results<p>');
 				for (var i = 0; i < resultsLength; i++) {
 					var title = result.SearchResponseMessageGet.SearchResult[0].Data[0].Records[0].Record[i].Items[0].Item[0].Data[0];
 					if (title != null)
 					res.write(i+1 +') <a href="/record?dbid=a9h&an=36108341"> ' + title  + '</a><br />');
-			}	
+			}
 			//res.write(util.inspect(result, {showHidden: false, depth: null}))
 			//.SearchResponseMessageGet.SearchResult[0].Statistics[0].TotalHits[0]
 			}
@@ -212,7 +220,7 @@ function edsRecord(res, req, xml){
 	res.writeHead(200, {"Content-Type": "text/html"});
 	res.write('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />\n');
 	res.write(body);
-	
+
 /*
 	parseString(xml, function (err, result) {
 		if (result.SearchResponseMessageGet != null){
@@ -220,12 +228,12 @@ function edsRecord(res, req, xml){
 			if (totalHits != 0){
 				var resultsLength = result.SearchResponseMessageGet.SearchResult[0].Data[0].Records[0].Record.length;
 				res.write('<p>Showing ' + resultsLength + ' of ');
-				res.write(totalHits + 'results<p>');		
+				res.write(totalHits + 'results<p>');
 				for (var i = 0; i < resultsLength; i++) {
 					var title = result.SearchResponseMessageGet.SearchResult[0].Data[0].Records[0].Record[i].Items[0].Item[0].Data[0];
 					if (title != null)
 					res.write(i+1 +') ' + title  + '<br />');
-			}	
+			}
 			//res.write(util.inspect(result, {showHidden: false, depth: null}))
 			//.SearchResponseMessageGet.SearchResult[0].Statistics[0].TotalHits[0]
 			}
@@ -237,7 +245,7 @@ function edsRecord(res, req, xml){
 			res.write('<div id="error">Error Something went wrong :(</div>');
 		}
 	});
-*/		
+*/
 	res.end();
 
 }
