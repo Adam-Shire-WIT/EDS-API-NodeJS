@@ -70,10 +70,7 @@ request.end();
 
 function getAuthToken(res, req){
 
-  //check for existing Auth token
 
-  // if an doesn't exist get a new one
-  // if (!AuthToken) {
 
 
 
