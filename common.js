@@ -71,9 +71,6 @@ request.end();
 function getAuthToken(res, req){
 
 
-
-
-
 var authData = '<UIDAuthRequestMessage xmlns="http://www.ebscohost.com/services/public/AuthService/Response/2012/06/01">'+
 	'<UserId>'+EDS_USER+'</UserId>'+
 	'<Password>'+EDS_PASS+'</Password>'+

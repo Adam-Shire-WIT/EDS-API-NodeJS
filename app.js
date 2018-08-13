@@ -2,6 +2,18 @@ var express = require('express');
 var session = require('express-session');
 var app = express();
 var morgan = require('morgan')
+require('dotenv').config();
+
+const EDS_USER = process.env.EDS_USER;
+const EDS_PASS = process.env.EDS_PASS;
+const EDS_PROFILE = 'eds_api';
+const SESSION_SECRET = process.env.SESSION_SECRET;
+
+var ebsco = require('./lib/ebsco')({
+        edsUser: EDS_USER,
+        edsPass: EDS_PASS,
+        edsInterfaceId: EDS_PROFILE
+});
 
 
 var querystring = require("querystring");
@@ -11,9 +23,9 @@ var parseString = require('xml2js').parseString;
 var util = require('util');
 //EDS common functions used for this API implementations
 var foobar = require('./common.js');
-require('dotenv').config();
 
-const SESSION_SECRET = process.env.SESSION_SECRET;
+
+
 
 app.use(morgan('combined'))
 
@@ -186,11 +198,10 @@ request.end();
 
 
 app.get('/test', function (req, res) {
-	console.log('req : '+util.inspect(req, {showHidden: false, depth: null}));
-	var body = 'Auth ' + req.session.authToken + '<br />';
-	body += 'Session ' + req.session.sessionToken + '<br />';
-	res.writeHead(200, {"Content-Type": "text/html"});
-	res.write(body);
-	res.end();
+
+	ebsco.test(function(auth){
+    res.send(auth);
+
+  });
 
 });
