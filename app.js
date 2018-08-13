@@ -44,6 +44,7 @@ app.use(session({
 }));
 
 
+
 app.use(function(req, res, next) {
     res.header('Access-Control-Allow-Credentials', true);
     res.header('Access-Control-Allow-Origin', req.headers.origin);
@@ -75,26 +76,29 @@ app.get('/', function (req, res) {
 
 app.get('/search', function (req, res, next) {
 //console.log('req : '+util.inspect(req, {showHidden: false, depth: null}));
-foobar.getAuthToken(res, req)
-var body =  '<html>\n'+
-'<head>\n'+
-'<meta http-equiv="Content-Type" content="text/html; '+
-'charset=UTF-8" />\n'+
-'</head>\n'+
-'<body>\n'+
-'<div style="padding-left:480px"><form action="/results" method="get">\n'+
-'<input type="text" name="bquery" size="55"><br />\n'+
-'<input type="radio" name="search_options" checked> Keyword \n'+
-'<input type="radio" name="search_options" disabled="disabled"> Title \n'+
-'<input type="radio" name="search_options" disabled="disabled"> Author \n'+
-'<input type="submit" value="Buscar" />\n'+
-'</form></div>\n'+
-'</body>\n'+
-'</html>\n';
+ebsco.search(req, function(data){
+   res.json(data);
+});
+//var body =  '<html>\n'+
+// '<head>\n'+
+// '<meta http-equiv="Content-Type" content="text/html; '+
+// 'charset=UTF-8" />\n'+
+// '</head>\n'+
+// '<body>\n'+
+// '<div style="padding-left:480px"><form action="/results" method="get">\n'+
+// '<input type="text" name="bquery" size="55"><br />\n'+
+// '<input type="radio" name="search_options" checked> Keyword \n'+
+// '<input type="radio" name="search_options" disabled="disabled"> Title \n'+
+// '<input type="radio" name="search_options" disabled="disabled"> Author \n'+
+// '<input type="submit" value="Buscar" />\n'+
+// '</form></div>\n'+
+// '</body>\n'+
+// '</html>\n';
 
-res.writeHead(200, {"Content-Type": "text/html"});
-res.write(body);
-res.end();
+//res.writeHead(200, {"Content-Type": "text/html"});
+//res.write(body);
+//res.end();
+
 
 });
 
@@ -199,8 +203,12 @@ request.end();
 
 app.get('/test', function (req, res) {
 
-	ebsco.test(function(auth){
-    res.send(auth);
+	ebsco.test(req, function(request, auth){
+    const body = {
+      "auth token" : auth,
+     "session token" : request.session,
+   }
+    res.send(body);
 
   });
 
