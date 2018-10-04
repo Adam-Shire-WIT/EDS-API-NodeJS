@@ -2,157 +2,117 @@ const express = require('express');
 const session = require('express-session');
 const app = express();
 const morgan = require('morgan')
+var request = require('request');
 require('dotenv').config();
-var url = require('url');
 
-const EDS_USER = process.env.EDS_USER;
-const EDS_PASS = process.env.EDS_PASS;
-const EDS_PROFILE = 'eds_api';
 const SESSION_SECRET = process.env.SESSION_SECRET;
 
-const ebscoAuth = require('./lib/ebscoAuth');
+if (process.env.NODE_ENV === "development") {
+  var authData = JSON.stringify({UserId: 'username', Password: 'password', InterfaceId: 'eds_api'});
+}
 
-
-var http = require("http");
-var https = require("https");
-
-
+const edsapi = require('./lib/edsapi');
 
 app.use(session({
-	name: 'eds_session',
-	secret: SESSION_SECRET,
-	resave: false,
-	saveUninitialized: true,
-	cookie: {
-        path: '/',
-        //domain: 'yourdomain.com',
-        maxAge: 1000 * 60 * 24, // 24 hours
-        httpOnly: false
+  name: 'eds_session',
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    path: '/',
+    //domain: 'yourdomain.com',
+    maxAge: 1000 * 60 * 24, // 24 hours
+    httpOnly: false
 
-	}
+  }
 }));
 
+app.use(morgan('combined'));
 
-app.use(ebscoAuth({
-        edsUser: EDS_USER,
-        edsPass: EDS_PASS,
-        edsInterfaceId: EDS_PROFILE
-}));
-
-app.listen(8888, function () {
-  console.log('Server has started.');
+app.listen(8888, function() {
+  console.log('Server has started. listening on port 8888');
 });
 
+/// middleware /
 
+function handleSearchRequest(req, res, next) {
+  //console.log(req.session.authToken);
+  //var options = getSavedOptsFromRequest(req) || buildAPIRequestOptions(req);
 
+  var options = {
+    url: 'https://eds-api.ebscohost.com/edsapi/rest/Search?query-1=AND,' + req.query,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-authenticationToken': req.session.authToken,
+      'x-sessionToken': '6789'
+    }
+  };
 
-/// Routes////
+  request.get(options, function(err, response, body) {
+    if (err) {
+      console.log(err)
+      return;
+    }
+    //console.log("before refresh: " + req.session.authToken)
+    if (response.statusCode === 400) { // if there is a problem with the request
+      //  console.log("search request returned status code: " + response.statusCode)
+      //	console.log("here are the options I'm about to save")
+      //console.log(options)
+      //saveOptsToRequest(req, options)
+      refreshAuthToken(req).then(function authOk() {
+        //console.log("after refresh: " + req.session.authToken)
+        handleSearchRequest(req, res, next) // call function again
+      }).catch(function authKo() {
+        res.status(500).send('something');
+      });
+    } else {
+      res.body = body;
+      next();
+    }
+  });
 
-app.get('/autocomplete', function(req, res){
-	var term = req.query.term;
+};
 
-	//get autocomplete info
-	//res.json(req.session.autocomplete.Url);
+function refreshAuthToken(req) {
 
-//todo:FIX THIS
-	var myURL = 'example.org/';
-	console.log(myURL)
-	const custId = req.session.autocomplete.CustId;
-	const token = req.session.autocomplete.Token;
-	const uri = `?term=${term}&idx=rawqueries&filters=[{"name":"custid","values":["${custId}"]}]&${token}`
-	const options = {
-		host: myURL.host,
-		path:encodeURI(uri),
-		method: 'GET'
-	}
+  var refreshAuthTokenPromise = new Promise(function(resolve, reject) {
+    var options = {
+      url: 'https://eds-api.ebscohost.com/authservice/rest/UIDauth',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': authData.length
+      },
+      json: true,
+      body: authData
+    };
 
-	var autocompleteRequest = https.request(options, function(response) {
+    request.post(options, function(err, response, body) {
+      if (err) {
+        console.log(err)
+        reject(new Error(err))
+      }
 
-		var rawData = '';
-		response.setEncoding('utf8');
-		//data comes back as chunks, so put them all together
-		response.on('data', function(chunk){
-			rawData += chunk;
-		 console.log(`BODY: ${rawData}`)
-		});
+      var responseBody = body;
+      //console.log("auth request returned status code: " + response.statusCode)
+      if (response.statusCode === 200) {
+        //console.log("setting authToken to: " + responseBody.AuthToken)
+        req.session.authToken = responseBody.AuthToken;
 
-		response.on('end', function (){
+        //console.log(req.session.authToken)
+        resolve();
+      } else {
+        //console.log('SOMETHING HAPPENED');
+        reject(new Error("SOMETHING!!!"));
+      }
+    });
 
-			try {
-				const parsedData = JSON.parse(rawData);
-      //return response from EDS-API
-			 res.json(parsedData);
+  });
+  return refreshAuthTokenPromise;
+};
 
-			} catch (e) {
-				console.error(" there was a problem with the autocomplete Request: " + e.message);
-			}
+app.use('/search', handleSearchRequest);
 
-		});
-
+app.get('/search', function(req, res, next) {
+  res.json(res.body);
 });
-
-autocompleteRequest.on('error', function(e) {
-console.error(`problem with request: ${e.message}`);
-});
-
-autocompleteRequest.end();
-
-});
-
-
-app.get('/search', function(req, res){
-
-//send query to EDS-API search endpoint
-	var query = req.query.q;
-	const uri = `/edsapi/rest/Search?query-1=${query}`;
-	console.dir(query);
-	var options = {
-		host: 'eds-api.ebscohost.com',
-		path: encodeURI(uri),
-		method: 'GET',
-
-		headers: {
-		'Content-Type': 'application/json',
-			'x-authenticationToken': req.session.authToken,
-			'x-sessionToken': req.session.sessionToken
-		},
-	};
-
-	var searchRequest = https.request(options, function(response) {
-
-		var rawData = '';
-		response.setEncoding('utf8');
-		//data comes back as chunks, so put them all together
-		response.on('data', function(chunk){
-			rawData += chunk;
-		 console.log(`BODY: ${rawData}`)
-		});
-
-		response.on('end', function (){
-
-			try {
-				const parsedData = JSON.parse(rawData);
-      //return response from EDS-API
-			 res.json(parsedData);
-
-			} catch (e) {
-				console.error(" there was a problem with the search request: " + e.message);
-			}
-
-		});
-
-});
-
-searchRequest.on('error', function(e) {
-console.error(`problem with request: ${e.message}`);
-});
-
-searchRequest.end();
-
-});
-
-app.get('/', function (req, res) {
-  res.send(req.session);
-});
-
 module.exports = app;
