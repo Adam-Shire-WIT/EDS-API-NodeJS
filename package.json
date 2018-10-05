@@ -6,7 +6,6 @@
   "scripts": {
     "test": "mocha --exit"
   },
-  
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -17,6 +16,7 @@
     "nock": "^9.6.1",
     "npm": "^6.4.1",
     "request": "^2.87.0",
+    "request-debug": "^0.2.0",
     "xml2js": "^0.4.19"
   },
   "devDependencies": {
